@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>עזר למורים - הנחלת הלשון העברית</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body { font-family: 'Heebo', sans-serif; background-color: #F1F5F9; }
+    </style>
+</head>
+<body class="antialiased text-slate-900 bg-slate-100 min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const API_KEY = ""; // Canvas will automatically inject the API key here
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${API_KEY}`;
+
+        const parseMarkdown = (text) => {
+            let html = text
+                .replace(/\[\d+\]/g, '')
+                .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-gray-900">$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>')
+                .replace(/^\s*-\s+(.*)/gm, '<li class="ml-4 list-disc">$1</li>')
+                .replace(/\n/g, '<br />');
+            return { __html: html };
+        };
+
+        const Icons = {
+            Send: () => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: 'scaleX(-1)' }}>
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+            ),
+            ArrowRight: () => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                    <polyline points="12 5 19 12 12 19"></polyline>
+                </svg>
+            ),
+            User: () => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+            ),
+            Bot: () => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="10" rx="2"></rect>
+                    <circle cx="12" cy="5" r="2"></circle>
+                    <path d="M12 7v4"></path>
+                    <line x1="8" y1="16" x2="8" y2="16"></line>
+                    <line x1="16" y1="16" x2="16" y2="16"></line>
+                </svg>
+            ),
+            Loader: () => (
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-emerald-600 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            ),
+            BookOpen: () => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-600">
+                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                </svg>
+            ),
+            FileText: () => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-600">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+            ),
+            Sparkles: () => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500">
+                    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+                </svg>
+            )
+        };
+
+        const syllabusData = {
+            "חוברת רמה א-ב": {
+                "מטרות ביצוע": [
+                    { id: 1, page: 49, title: "הלומד יבין שאלות בסיסיות המתייחסות לפרטיו האישיים ויענה עליהן", concepts: ["עולה חדש", "שלום", "בוקר טוב", "להתראות", "נעים מאוד", "תודה רבה"], grammar: ["משפט שמני בהווה", "כינויי גוף", "צורני הנקבה סה/סת"] },
+                    { id: 2, page: 50, title: "הלומד ינהל שיחת היכרות קצרה וימסור פרטים על בן שיחו", concepts: ["מה שלומך?", "מה נשמע?", "ברוך השם", "יהיה טוב", "יפה מאוד"], grammar: ["משפט שמני בהווה", "משפט פועלי בהווה", "שם המספר מונה 0-10 בנקבה"] },
+                    { id: 3, page: 51, title: "הלומד יכיר את מערכת הצלילים הרווחים בעברית הישראלית", concepts: ["הגייה נכונה", "אותיות דפוס וכתב"] },
+                    { id: 4, page: 52, title: "הלומד ימסור מידע על עצמו ועל בן שיחו", concepts: ["לדבר עם", "להבין", "לכתוב", "לקרוא"], grammar: ["משפט פועלי בהווה", "צורני נטיית הבינוני ביחיד"] },
+                    { id: 5, page: 53, title: "הלומד ימסור מידע על עצמו כחלק מקבוצה ויבקש מחבריו מידע", concepts: ["אנחנו", "אתם", "הם"], grammar: ["משפט שמני בהווה (רבים)", "משפט פועלי בהווה (רבים)", "ריבוי זכר/נקבה סדיר (ים/ות)"] },
+                    { id: 6, page: 54, title: "הלומד יציג את עצמו וימלא פרטים אישיים בשאלון", concepts: ["מצב משפחתי", "שם משפחה", "ארץ לידה", "רווק", "נשוי", "גרוש", "אלמן"], grammar: ["משפט שמני בהווה", "פסוקית מושא עם 'ש...'"] },
+                    { id: 7, page: 55, title: "הלומד יציג בקצרה אנשים וחפצים בסביבתו", concepts: ["זה", "זאת", "אלה", "כיתה", "שולחן", "כיסא"], grammar: ["משפט שמני עם כינוי רומז", "משפט יש/אין בהווה", "פסוקית תנאי בהווה", "ריבוי זכר/נקבה חריג (חלונות, מילים)"] },
+                    { id: 8, page: 56, title: "הלומד יבקש מידע בסיסי בתחומי תפקוד שונים", concepts: ["איפה", "מאין", "מה קרה", "נסיעה טובה"], grammar: ["תווית היידוע ה-", "צירופי יחס ב/ל/מ"] },
+                    { id: 9, page: 57, title: "הלומד יתאר את משפחתו", concepts: ["בן זוג", "יום הולדת", "קרוב משפחה", "תעודת זהות"], grammar: ["משפט יש/אין עם מילת היחס ל' בנטייה", "משפט חג\"מ (מזל ש/חבל ש/טוב ש)", "דיבור עקיף"] },
+                    { id: 10, page: 58, title: "הלומד יבקש מידע, פריטים ועזרה במקומות שונים", concepts: ["כסף קטן", "אישור מחלה", "כרטיס אשראי"], grammar: ["פסוקית סיבה (כי / מפני ש...)", "משפט שם פועל (רוצה/אוהב/צריך/יכול + שם פועל)", "נטיית שמות עצם (בעלי, אשתי, אחי, אחותי)"] },
+                    { id: 11, page: 59, title: "הלומד ימלא שאלון פרטים אישיים ויכתוב הודעה", concepts: ["אסיפת הורים", "תאריך לידה", "דואר אלקטרוני"], grammar: ["כתיבת הודעה קצרה ומבנה מכתב/מסרון"] },
+                    { id: 12, page: 60, title: "הלומד יכיר את מפת ישראל ועיר הבירה", concepts: ["עיר בירה", "ירושלים", "דרום", "צפון", "מזרח", "מערב"], grammar: ["משפט פועלי בהווה (נמצא ב...)"] },
+                    { id: 13, page: 61, title: "הלומד יבין וישתמש בביטויי זמן בשיחות", concepts: ["אחרי הצהריים", "בדיוק", "מאוחר", "מוקדם"], grammar: ["משפט שמני/פועלי בהווה עם ביטויי זמן", "שם המספר מונה (שעות וחלקי שעה)"] },
+                    { id: 14, page: 62, title: "הלומד יבקש מידע על שעות פעילות ויקבע פגישה", concepts: ["שעות קבלה", "שעות פתיחה", "ללא הפסקה"], grammar: ["משפט חג\"מ (אפשר/צריך + שם פועל)", "משפט סתמי (פותחים/סוגרים)", "שם המספר סודר 1-10"] },
+                    { id: 15, page: 63, title: "הלומד יתאר את פעילותו היומיומית", concepts: ["בדרך כלל", "אף פעם לא", "פעמיים בשבוע"], grammar: ["משפט פועלי בהווה עם מילת היחס 'את' בנטייה", "פסוקית זמן בהווה (כש... / לפני ש... / אחרי ש...)"] },
+                    { id: 16, page: 64, title: "הלומד יספר היכן היה ויענה על שאלות", concepts: ["אתמול", "לפני חודש", "שלשום", "שדה תעופה", "חוף ים"], grammar: ["נטיית הפועל 'היה' בעבר", "מילת היחס אצל/עם בנטייה בעבר"] },
+                    { id: 17, page: 65, title: "הלומד ידבר בזמן עבר ויבין את הנאמר", concepts: ["עדיין", "עוד", "התקשר", "ביקר"], grammar: ["בניין קל (פָּעַל) עבר/הווה/עתיד", "בניין קל ע\"ו-ע\"י", "בניין קל שלמים", "בניין פיעל שלמים", "בניין הפעיל שלמים", "בניין התפעל שלמים", "בניין נפעל שלמים", "בניין קל ל\"ה"] },
+                    { id: 18, page: 66, title: "הלומד יבין כותרות חדשות וידווח עליהן", concepts: ["ארצות הברית", "חבר כנסת", "ראש הממשלה"], grammar: ["משפט פועלי בעבר ובהווה", "מילות שאלה עם מילות יחס (על מי, על מה)"] },
+                    { id: 19, page: 67, title: "הלומד יבין תיאורי מזג אוויר וישוחח עליהם", concepts: ["גשם שוטף", "מזג אוויר", "סוף שבוע"], grammar: ["ערך היתרון (יותר/פחות מ...)", "חג\"מ (כדאי/חשוב/טוב/נעים/קשה/קל + שם פועל)"] },
+                    { id: 20, page: 68, title: "הלומד יאתר, יבקש וימסור מידע על דרכי הגעה", concepts: ["ללכת ברגל", "מעבר חצייה", "תחנה מרכזית"], grammar: ["ציווי", "פעלים חד-הברתיים שגורים בציווי", "גזרת פ\"י/נחי פי\"ו בציווי (רד, שב, לך)", "ה' המגמה"] },
+                    { id: 21, page: 69, title: "הלומד יבקש מידע על דירה חדשה ויתאר דירה", concepts: ["בית משותף", "בעל בית", "שכר דירה"], grammar: ["משפט יש/אין בעבר (היה לי, הייתה לי, היו לי)"] },
+                    { id: 22, page: 70, title: "הלומד יבין דברי ברכה ויברך באירועים", concepts: ["ברית מילה", "בר מצווה", "חתונה", "החלמה מהירה"], grammar: ["משפט פועלי בהווה (מאחל/מברך)"] },
+                    { id: 23, page: 71, title: "הלומד יברר מידע על מחירים ואפשרויות תשלום", concepts: ["במזומן", "בתשלומים", "חינם", "מבצע", "הנחה"], grammar: ["תיאור תכלית (כדי + שם פועל)", "סמיכות (יחיד/רבים)", "שם המספר מונה 100-100,000"] },
+                    { id: 24, page: 72, title: "הלומד יתאר מצב בריאות ויבין הוראות רופא", concepts: ["כאב ראש", "חום", "תרופה", "זריקה"], grammar: ["משפט פועלי בהווה/עבר (כואב לי)", "משפט שם פועל (מוכרח/חייב + שם פועל)", "חג\"מ (אסור/מותר + שם פועל)", "תיאור סיבה (בגלל + שם עצם)", "משפט מחובר תוצאה (לכן)", "צורן הזוגי (ים)"] },
+                    { id: 25, page: 85, title: "הלומד ידבר ויכתוב בזמן עתיד", concepts: ["בחודש הבא", "בעוד חודש", "בשנה הבאה", "נראה לי ש..."], grammar: ["זמן עתיד בכל הבניינים", "בניין קל ע\"ו-ע\"י", "בניין הפעיל שלמים", "בניין קל שלמים (אפעול/אפעל)", "בניין פיעל שלמים", "בניין התפעל שלמים", "בניין נפעל שלמים", "בניין קל ל\"ג", "בניין קל ל\"ה", "פסוקית תנאי קיים (אם... ׂ)"] },
+                    { id: 26, page: 86, title: "הלומד ינהל שיחה בבנק", concepts: ["הוראת קבע", "דף חשבון", "פנקס צ'קים"], grammar: ["משפט חג\"מ (נא + שם פועל)", "מילות יחס לפני/אחרי בנטייה"] },
+                    { id: 27, page: 87, title: "הלומד יתאר מוצר לקנייה ויעמוד על זכויותיו כצרכן", concepts: ["מכירת חיסול", "מע\"מ", "פתק החלפה", "אחריות"], grammar: ["בניין הפעיל פ\"ג בעבר/עתיד", "בניין קל לתת (גזרת חפ\"נ/פ\"נ)", "תיאור השוואה (כמו... / כזה, כזאת, כאלה)"] },
+                    { id: 28, page: 88, title: "הלומד יאתר מידע במודעות דירה", concepts: ["כניסה מיידית", "שכר דירה", "משכנתה"], grammar: ["משפט שם פועל (מעוניין + שם פועל)", "תיאור אופן (דרך + שם עצם)", "תיאור ויתור (למרות / בכל זאת / למרות זאת)"] },
+                    { id: 29, page: 89, title: "הלומד יתקשר כדייר בבית משותף ויכתוב הודעות", concepts: ["ועד הבית", "אסיפת דיירים", "ריסוס", "הדברה"], grammar: ["כתיבת הודעות לדיירים ושימוש בפעלים בבניינים השונים"] },
+                    { id: 30, page: 90, title: "הלומד יכיר מוסדות חינוך ויתקשר עם בעלי תפקידים", concepts: ["גן חובה", "חטיבת ביניים", "מסיבת סיום", "תעודת בגרות"], grammar: ["בניין הפעיל ע\"ו-ע\"י (עבר/עתיד)", "בניין פיעל ל\"ה - עבר", "בניין קל נחי פי\"ו - עתיד (גזרת פ\"י/פ\"ו, כגון: יֵשֵׁב)", "משפט יש/אין + שם פועל", "ציווי שלילי: אל + פועל בעתיד (גוף II)"] },
+                    { id: 31, page: 91, title: "הלומד יבין הזמנות ויזמין פריטים ואנשים", concepts: ["ארוחה עסקית", "גן אירועים", "קבלת פנים"], grammar: ["משפט פועלי בעתיד (יכול + שם פועל)", "משפט חג\"מ בעתיד (חשוב/רצוי ש... + עתיד)", "ערך ההפלגה (הכי + שם תואר / שם תואר + ביותר)"] },
+                    { id: 32, page: 92, title: "הלומד יכיר דרכים לחיפוש עבודה וימלא שאלון", concepts: ["חצי משרה", "משרה מלאה", "קורות חיים", "שפות"], grammar: ["בניין פיעל ל\"ה - עתיד", "בניין קל חפ\"נ / פ\"נ - עתיד (ייכנס/ייסע)", "משפט יש/אין צורך ב...", "כינוי עצמי בנטייה", "משקלי מקצועות"] },
+                    { id: 33, page: 93, title: "הלומד יבין מידע בשלטים שכיחים", concepts: ["זהירות", "סכנה", "העישון אסור", "אין כניסה"], grammar: ["משפט חסר", "שם פעולה מיודע + שם תואר", "שמות פעולה בכל הבניינים והגזרות"] },
+                    { id: 34, page: 94, title: "הלומד ישוחח עם רופא ויבין הוראותיו", concepts: ["צילום רנטגן", "התחייבות", "חדר מיון"], grammar: ["פעלים בסבל/סובל מ...", "פועל מזיק ל...", "לשון ציווי והוראות רופא"] },
+                    { id: 35, page: 95, title: "הלומד יתאר ויבין מידע על אנשים והתנהגותם", concepts: ["תכונת אופי", "אדיש", "בזבזן", "עקשן"], grammar: ["תואר נשואי בהווה (דומה ל... / שונה מ...)", "משפט מחובר ניגוד (לעומת זאת)"] },
+                    { id: 36, page: 96, title: "הלומד יבין מידע חדשותי קצר וידווח עליו", concepts: ["אבטלה", "דמי אבטלה", "משא ומתן"], grammar: ["בניין הפעיל חפ\"נ / פ\"נ (עבר/עתיד)", "בניין הפעיל נפי\"ו / פ\"י (עבר/הווה/עתיד, כגון: מוריד/יוריד)", "משפט עתיד קרוב (עומד + שם פועל)", "שם המספר מונה ממיליון ומעלה"] },
+                    { id: 37, page: 97, title: "הלומד יכיר את דגל המדינה, סמלה וההמנון", concepts: ["בית המקדש", "הקונגרס הציוני", "מגן דוד", "טלית"], grammar: ["טקסט מורשת ושירה"] },
+                    { id: 38, page: 98, title: "הלומד יכיר אישים ומקומות חשובים בתולדות הארץ", concepts: ["הסכם שלום", "מלחמת העולם", "על שם"], grammar: ["משפט פועלי בעבר (קם ב... / נולד / נרצח / נהורס)"] }
+                ]
+            },
+            "חוברת רמה ג-ד": {
+                "מטרות ביצוע": [
+                    { id: 39, page: 49, title: "הלומד יבין כתבות מידע קצרות וישוחח עליהן", concepts: ["הפסקת אש", "אמצעי תקשורת", "מבצע צבאי"], grammar: ["בניין פועל", "בניין הופעל", "נפעל", "עבר", "הווה", "עתיד", "פועל סביל"] },
+                    { id: 40, page: 50, title: "הלומד יבין את הנאמר בריאיון עבודה ויגיב בהתאם", concepts: ["ראיון עבודה", "עבודת צוות", "הסבה מקצועית", "קורות חיים"], grammar: ["שם פועל", "תואר נשואי"] },
+                    { id: 41, page: 51, title: "הלומד לברר זכויות כעובד ויבין תלוש משכורת", concepts: ["דמי הבראה", "קופת גמל", "מס הכנסה", "ברוטו", "נטו"], grammar: ["פסוקית זמן"] },
+                    { id: 42, page: 52, title: "הלומד יתנהל במסגרות רפואיות ויבין את הנאמר", concepts: ["אשפוז יום", "טיפול נמרץ", "משכך כאבים", "ביטוח רפואי"], grammar: ["חג\"מ בהווה", "בינוני פעול"] },
+                    { id: 43, page: 53, title: "הלומד יתוודע למסגרות רפואיות לטיפול מונע", concepts: ["אורח חיים", "טיפול מונע", "תוחלת חיים", "רפואה משלימה"], grammar: ["בניין קל", "עתיד", "בינוני"] },
+                    { id: 44, page: 54, title: "הלומד יכיר מושגים בתחום תקשורת הורים-מורים", concepts: ["גיל ההתבגרות", "משמעת", "סמכות", "דימוי עצמי"], grammar: ["השוואה", "נטיית הקניין"] },
+                    { id: 45, page: 55, title: "הלומד יבין מידע בתחום נסיעות וידע להתנהל על פיו", concepts: ["אמצעי תשלום", "מערכת ניווט", "רב קו", "תחבורה ציבורית"], grammar: ["ציווי", "כינויים עם אוגד"] },
+                    { id: 46, page: 56, title: "הלומד יבין וימסור מידע בנושאי נהיגה מונעת ותאונות", concepts: ["זהירות בדרכים", "תאונת פגע וברח", "מהירות מופרזת"], grammar: ["משפט ניגוד", "הוספה והדגשה"] },
+                    { id: 47, page: 57, title: "הלומד יתאר אישים ואתרים חשובים בארץ", concepts: ["רשות הטבע והגנים", "עיר נמל", "שמורת טבע"], grammar: ["סמיכות", "נאלץ", "הופעל"] },
+                    { id: 48, page: 58, title: "הלומד יבין תיאורי מזג אוויר ויוכל לשוחח עליהם", concepts: ["רעידת אדמה", "שיטפון", "חמסין", "סערה"], grammar: ["הלך ו' (תהליך)", "שמות תואר גזורי שם"] },
+                    { id: 49, page: 59, title: "הלומד יתאר מופעי תרבות וספורט וימליץ עליהם", concepts: ["הצגת בכורה", "מדע בדיוני", "רב מכר", "מחיאות כפיים"], grammar: ["פסוקית נושא", "מה ש...", "מי ש..."] },
+                    { id: 50, page: 60, title: "הלומד יברר מידע על מכשור טכנולוגי", concepts: ["חבילת גלישה", "ספק אינטרנט", "תמיכה טכנית"], grammar: ["תכלית", "תנאי בטל (אילו/לו)"] },
+                    { id: 51, page: 61, title: "הלומד יכיר את מוסדות השלטון בארץ", concepts: ["בית משפט", "מבקר המדינה", "קו העוני", "רשות מקומית"], grammar: ["פסוקית מושא", "למי ש..."] },
+                    { id: 52, page: 62, title: "הלומד יבין קטעי מידע על מחקרים וחידושים מדעיים", concepts: ["הלשכה המרכזית לסטטיסטיקה", "הסקת מסקנות", "כתב עת"], grammar: ["השוואה", "שם המספר (חלקי השלם)"] },
+                    { id: 53, page: 63, title: "הלומד יבין מידע על איכות הסביבה וישוחח עליו", concepts: ["איכות הסביבה", "זיהום אוויר", "מי תהום", "חומר מתכלה"], grammar: ["ויתור (אף על פי כן, אף על פי ש...)"] },
+                    { id: 54, page: 77, title: "הלומד יבין כתבות מידע וטיעון בתקשורת ויביע דעתו", concepts: ["העשירון העליון", "שביתת רעב", "שירות קבע", "תנועת מחאה"], grammar: ["סיבה (בעקבות, בשל)", "תכלית"] },
+                    { id: 55, page: 78, title: "הלומד יבין וימסור מידע על תנועה בדרכים", concepts: ["אגרת רישוי", "נפח תנועה", "רכב הסעות", "כביש אגרה"], grammar: ["תנאי בטל (לולא, אלמלא)"] },
+                    { id: 56, page: 79, title: "הלומד יכיר את עולם העבודה וידע להתנהל בו", concepts: ["איגוד מקצועי", "מוסר עבודה", "משאבי אנוש", "קביעות"], grammar: ["חג\"מ", "פסוקית נושא"] },
+                    { id: 57, page: 80, title: "הלומד יכיר סוגיות רפואיות ודרכי טיפול", concepts: ["המתת חסד", "אם פונדקאית", "מח עצם", "סל תרופות"], grammar: ["בניינים (פיעל, הפעיל, התפעל, נפעל, פועל, הופעל)"] },
+                    { id: 58, page: 81, title: "הלומד יכיר מושגים מתחום החוק והמשפט", concepts: ["גזר דין", "חף מפשע", "עד ראייה", "מטעם ההגנה"], grammar: ["שלילה (אין)", "ניתן + שם פועל"] },
+                    { id: 59, page: 82, title: "Hלומד יכיר מושגים בנושא זכויות אדם ואזרח", concepts: ["הפרדת רשויות", "חופש הביטוי", "זכויות הפרט", "חוק יסוד"], grammar: ["ויתור (על אף)", "פסוקית לוואי"] },
+                    { id: 60, page: 83, title: "הלומד יכיר סוגיות באיכות הסביבה וידון בחשיבותן", concepts: ["אנרגיה סולרית", "אפקט החממה", "בנייה ירוקה"], grammar: ["סיבה (כיוון ש, מאחר ש)"] },
+                    { id: 61, page: 84, title: "הלומד יבין קטעי מידע על מחקרים וסקרים", concepts: ["מדגם מייצג", "להפיק לקחים"], grammar: ["הסתייגות (אמנם... אך)", "תנאי (אלא אם כן)"] },
+                    { id: 62, page: 85, title: "הלומד יכיר מושגים בכלכלה ויתנהל בצרכנות נבונה", concepts: ["כספי ציבור", "מדד המחירים לצרכן", "צריכה מוגברת"], grammar: ["השוואה", "מילת הכפלה (פי שניים)"] },
+                    { id: 63, page: 86, title: "הלומד יכיר סוגיות בחינוך וישוחח על כך", concepts: ["בעל צרכים מיוחדים", "חופש פעולה", "לקות למידה", "סמכות הורית"], grammar: ["מידה (ככל ש... כך...)", "כינוי הדדיות (זה מזה)"] },
+                    { id: 64, page: 87, title: "הלומד יתוודע לתרבות הפנאי בישראל", concepts: ["מימוש עצמי", "זהות עצמית", "הגשמה עצמית"], grammar: ["התפעל", "הפעיל", "זמן (כל עוד, עד שלא)"] },
+                    { id: 65, page: 88, title: "הלומד יבין קטעי ספרות עברית ושירים וישוחח עליהם", concepts: ["השקפת עולם", "סערת רגשות", "נקודת מפנה"], grammar: ["נפעל", "הופעל", "תוצאה (לפיכך, על כן)"] },
+                    { id: 66, page: 89, title: "הלומד יבין מידע על צבא וביטחון וישוחח עליו", concepts: ["בן מיעוטים", "הפרת סדר", "מוקד חירום", "פיקוד העורף"], grammar: ["תנאי (בתנאי ש...)", "סמיכות מורכבת"] }
+                ]
+            }
+        };
+
+        const getSystemPrompt = (booklet, mode) => {
+            const data = syllabusData[booklet] || syllabusData["חוברת רמה א-ב"];
+            const goalsStr = data["מטרות ביצוע"].map(g => `- מטרה ${g.id} (עמ' ${g.page}): ${g.title}. מושגים: ${g.concepts.join(', ')}${g.grammar ? `. דקדוק, בניינים, גזרות ומבנים תחביריים: ${g.grammar.join(', ')}` : ''}`).join('\n');
+            
+            if (mode === 'syllabus') {
+                return `
+אתה עוזר פדגוגי לאיתור מיקום נושאים, מושגים ופריטי דקדוק בתוכנית הלימודים "${booklet}".
+הנה רשימת מטרות הביצוע, המושגים ופריטי הדקדוק בחוברת:
+${goalsStr}
+
+**חוקים קפדניים למצב איתור מיקום (Syllabus Mode):**
+1. ענה אך ורק ובמדויק על מה שנשאלת! אל תוסיף פירוט לא רלוונטי, מבנים תחביריים עקפים או הסברים מיותרים (למשל: אם נשאלת על הנטייה של מילת היחס "מן", ציין רק היכן מופיעה נטיית מילת היחס "מן" בלבד, ואל תפרט על מבנים עקפים כגון "שונה מ...").
+2. סרוק בקפדנות את כל מטרות הביצוע ופריטי הדקדוק בחוברת וזהה במדויק את **כל** המטרות והעמודים שבהם הנושא או פריט הדקדוק מופיע.
+3. ניסוח התשובה: ציין באופן ממוקד וקצר: "הנושא מופיע במטרת ביצוע מספר [מספר] בעמוד מספר [עמוד]". אם הנושא מופיע במספר מטרות - חובה לציין את כולן בצורה תמציתית.
+4. **חל איסור מוחלט להתקדם למערך שיעור, לתכנון שיעור או להוסיף ניתוחים דקדוקיים שלא נתבקשו!**
+5. בסוף התשובה שלך, שאל בדיוק את השאלה הבאה: "האם תרצה לקרוא את התוכן של עמודים אלו?"
+`;
+            } else {
+                // Lesson Planning Mode
+                return `
+אתה עוזר פדגוגي מומחה לתכנון שיעורים והוראת עברית כשפה שנייה (עולים חדשים) המבוסס על "${booklet}".
+הנה רשימת מטרות הביצוע והמושגים בחוברת לצורך התאמה רמתית:
+${goalsStr}
+
+**חוקים קפדניים למצב תכנון שיעור (Lesson Planning Mode):**
+1. כאשר המורה מבקשת עזרה בהוראת נושא מסוים:
+   - **חובה לשאול תחילה שאלות מבהירות את המיקום או המטרה המדויקת**, למשל: אם המושג או מילת היחס מופיעים במספר מטרות (כמו במטרה 7 ובמטרה 8), שאל את המורה לאיזו מטרה או מיקום מדויק היא מתכוונת, כדי להבין מה התלמידים למדו לפניה ולדייק את מערך השיעור. **אל תציג למורה את חישוב המטרות באופן חשבוני גלוי, אלא שאל שאלות הכוונה.**
+   - לאחר שהמורה מבהירה או בשיחה עוקבת, השתמש ביכולות החיפוש ברשת (Google Search tool) כדי לחפש ברשת חומרים, מערכים או קטעי קריאה קיימים להוראת עברית כשפה שנייה בנושא המבוקש.
+   - הצע למורה מערך שיעור ותרגילים מותאמים במדויק לרמה ולאוצר המילים המצטבר.
+2. חוקים פדגוגיים נוקשים: משלב נמוך, פשוט וקל מאוד, משפטים קצרים ופשוטים.
+3. הגבלת פאסיב (סביל):
+   ${booklet === 'חוברת רמה א-ב' 
+     ? '> **חל איסור מוחלט** על שימוש במשפטים פאסיביים (סבילים). השתמש רק במשפטים פעילים (אקטיביים)!!' 
+     : '> ניתן לשלב פאסיבי (סביל), אך תוך שמירה קפדנית על משלב נמוך, בסיסי ומשפטים קצרים מאוד.'}
+`;
+            }
+        };
+
+        const HomeScreen = ({ onSelect }) => {
+            const [showBookletModal, setShowBookletModal] = useState(false);
+            const [selectedAction, setSelectedAction] = useState(null); // 'syllabus' or 'lesson'
+            const [isEditingHeader, setIsEditingHeader] = useState(false);
+            
+            const [headerConfig, setHeaderConfig] = useState({
+                title: "ברוכים הבאים - עזר למורים",
+                subtitle: "באיזו חוברת תרצו להשתמש היום? בצעו בחירה והפיקו מערכי שיעור מותאמים.",
+                imageUrl: "image_c6369f.png"
+            });
+
+            const [tempConfig, setTempConfig] = useState(headerConfig);
+
+            const handleSaveHeader = (e) => {
+                e.preventDefault();
+                setHeaderConfig(tempConfig);
+                setIsEditingHeader(false);
+            };
+
+            const handleImageUpload = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (uploadEvent) => {
+                        setTempConfig(prev => ({ ...prev, imageUrl: uploadEvent.target.result }));
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            const handleBookletChoice = (bookletName) => {
+                setShowBookletModal(false);
+                onSelect(bookletName, selectedAction || 'syllabus');
+            };
+
+            const triggerAction = (actionType) => {
+                setSelectedAction(actionType);
+                if (actionType === 'lesson') {
+                    setShowBookletModal(true);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-100 flex flex-col items-center justify-center p-4 sm:p-8 relative">
+                    
+                    {/* Floating Edit Header Button */}
+                    <button
+                        onClick={() => { setTempConfig(headerConfig); setIsEditingHeader(true); }}
+                        className="absolute top-4 left-4 bg-white/90 backdrop-blur-md border border-emerald-300 hover:bg-emerald-600 hover:text-white text-emerald-800 px-4 py-2 rounded-2xl shadow-md font-bold text-sm flex items-center gap-2 transition-all cursor-pointer z-20"
+                        title="ערוך את השער והתמונה של האתר"
+                    >
+                        <span className="text-sm">עריכת שער האתר</span>
+                    </button>
+
+                    <div className="max-w-4xl w-full mx-auto space-y-8 text-center">
+                        
+                        {/* Header Section (Green placeholder box completely removed) */}
+                        <div className="space-y-4 max-w-3xl mx-auto pt-4">
+                            <h1 className="text-4xl sm:text-6xl font-black text-slate-900 tracking-tight">
+                                {headerConfig.title}
+                            </h1>
+                            <p className="text-lg sm:text-xl text-slate-700 font-medium">
+                                {headerConfig.subtitle}
+                            </p>
+                        </div>
+
+                        {/* Clickable Lesson Planning AI Banner */}
+                        <button 
+                            onClick={() => triggerAction('lesson')}
+                            className="w-full bg-white/95 backdrop-blur-md border-3 border-emerald-300 rounded-3xl p-6 sm:p-8 shadow-xl hover:shadow-2xl hover:border-emerald-600 transition-all duration-300 text-right flex items-center justify-between cursor-pointer group focus:outline-none focus:ring-4 focus:ring-emerald-300"
+                        >
+                            <div className="flex items-center gap-4 text-emerald-800">
+                                <div className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-700 shadow-inner flex-shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                    <Icons.FileText />
+                                </div>
+                                <div>
+                                    <h2 className="text-2xl font-black group-hover:text-emerald-700 transition-colors">תכנון שיעור (מבוסס AI וחיפוש ברשת)</h2>
+                                </div>
+                            </div>
+                            <div className="hidden sm:flex items-center gap-2 bg-emerald-600 text-white px-5 py-3 rounded-2xl text-sm font-bold shadow group-hover:bg-emerald-700 transition-colors flex-shrink-0">
+                                <span>התחל תכנון</span>
+                                <Icons.ArrowRight />
+                            </div>
+                        </button>
+
+                        {/* Booklet Selection Buttons (Syllabus Search Mode - strictly location lookup) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-2xl mx-auto pt-2">
+                            <button 
+                                onClick={() => onSelect('חוברת רמה א-ב', 'syllabus')}
+                                className="group relative bg-white/90 backdrop-blur-md border-3 border-emerald-300 rounded-3xl p-6 shadow-xl hover:shadow-2xl hover:border-emerald-600 transition-all duration-300 flex flex-col items-center text-center focus:outline-none focus:ring-4 focus:ring-emerald-300 overflow-hidden transform hover:-translate-y-1 cursor-pointer"
+                            >
+                                <div className="w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center mb-4 group-hover:bg-emerald-600 transition-colors shadow-inner text-emerald-700 group-hover:text-white">
+                                    <Icons.BookOpen />
+                                </div>
+                                <h2 className="text-2xl font-black text-slate-900 mb-2 group-hover:text-emerald-700 transition-colors">חוברת רמה א-ב</h2>
+                                <p className="text-slate-600 text-sm font-medium">איתור מיקום נושאים ודקדוק במטרות 1-38 (ללא מעבר למערכי שיעור).</p>
+                            </button>
+
+                            <button 
+                                onClick={() => onSelect('חוברת רמה ג-ד', 'syllabus')}
+                                className="group relative bg-white/90 backdrop-blur-md border-3 border-teal-300 rounded-3xl p-6 shadow-xl hover:shadow-2xl hover:border-teal-600 transition-all duration-300 flex flex-col items-center text-center focus:outline-none focus:ring-4 focus:ring-teal-300 overflow-hidden transform hover:-translate-y-1 cursor-pointer"
+                            >
+                                <div className="w-16 h-16 rounded-2xl bg-teal-100 flex items-center justify-center mb-4 group-hover:bg-teal-600 transition-colors shadow-inner text-teal-700 group-hover:text-white">
+                                    <Icons.BookOpen />
+                                </div>
+                                <h2 className="text-2xl font-black text-slate-900 mb-2 group-hover:text-teal-700 transition-colors">חוברת רמה ג-ד</h2>
+                                <p className="text-slate-600 text-sm font-medium">איתור מיקום נושאים ודקדוק במטרות 39-66 (ללא מעבר למערכי שיעור).</p>
+                            </button>
+                        </div>
+
+                        <footer className="text-sm text-slate-500 font-medium pt-2">
+                            האתר פתוח לכולם ללא צורך בהזדהות או סיסמה • מותאם למורי עברית כשפה שנייה
+                        </footer>
+
+                    </div>
+
+                    {/* Booklet Selection Modal triggered by Lesson Planning banner */}
+                    {showBookletModal && (
+                        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                            <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-6 text-right">
+                                <div className="flex items-center justify-between border-b pb-3">
+                                    <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                                        <Icons.Sparkles /> בחירת חוברת לתכנון שיעור AI
+                                    </h3>
+                                    <button 
+                                        onClick={() => setShowBookletModal(false)}
+                                        className="text-slate-400 hover:text-slate-600 font-bold text-lg cursor-pointer"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                                <p className="text-slate-600 text-sm font-medium">
+                                    בחר את החוברת שעליה תרצה שהמערכת תתבסס עבור תכנון השיעור וניתוח אוצר המילים הקודם:
+                                </p>
+                                <div className="space-y-3">
+                                    <button
+                                        onClick={() => handleBookletChoice('חוברת רמה א-ב')}
+                                        className="w-full bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 font-bold p-4 rounded-2xl transition-colors text-right flex items-center justify-between cursor-pointer"
+                                    >
+                                        <span>חוברת רמה א-ב (מטרות 1-38)</span>
+                                        <Icons.ArrowRight />
+                                    </button>
+                                    <button
+                                        onClick={() => handleBookletChoice('חוברת רמה ג-ד')}
+                                        className="w-full bg-teal-50 hover:bg-teal-100 border border-teal-300 text-teal-900 font-bold p-4 rounded-2xl transition-colors text-right flex items-center justify-between cursor-pointer"
+                                    >
+                                        <span>חוברת רמה ג-ד (מטרות 39-66)</span>
+                                        <Icons.ArrowRight />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Header Customization Modal */}
+                    {isEditingHeader && (
+                        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                            <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 text-right max-h-[90vh] overflow-y-auto">
+                                <div className="flex items-center justify-between border-b pb-3">
+                                    <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                                        <span>עריכת שער האתר</span>
+                                    </h3>
+                                    <button 
+                                        onClick={() => setIsEditingHeader(false)}
+                                        className="text-slate-400 hover:text-slate-600 font-bold text-lg cursor-pointer"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+
+                                <form onSubmit={handleSaveHeader} className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-1">כותרת ראשית (כותרת האתר)</label>
+                                        <input 
+                                            type="text" 
+                                            value={tempConfig.title}
+                                            onChange={(e) => setTempConfig({...tempConfig, title: e.target.value})}
+                                            className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                                            required
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-1">כותרת משנה</label>
+                                        <textarea 
+                                            value={tempConfig.subtitle}
+                                            onChange={(e) => setTempConfig({...tempConfig, subtitle: e.target.value})}
+                                            className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none resize-none h-20"
+                                            required
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-1">קישור לתמונה או העלאת קובץ</label>
+                                        <input 
+                                            type="text" 
+                                            value={tempConfig.imageUrl}
+                                            onChange={(e) => setTempConfig({...tempConfig, imageUrl: e.target.value})}
+                                            placeholder="כתובת URL של תמונה"
+                                            className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none mb-2"
+                                        />
+                                        <input 
+                                            type="file" 
+                                            accept="image/*"
+                                            onChange={handleImageUpload}
+                                            className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
+                                        />
+                                    </div>
+
+                                    <div className="flex justify-end gap-3 pt-4 border-t">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsEditingHeader(false)}
+                                            className="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-100 cursor-pointer text-sm"
+                                        >
+                                            ביטול
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            className="px-6 py-2.5 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 cursor-pointer text-sm shadow"
+                                        >
+                                            שמור שינויים
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const ChatScreen = ({ booklet, mode, onBack }) => {
+            const initialGreeting = mode === 'syllabus'
+                ? `שלום! בחרת לחפש מיקומים ב**${booklet}**. כתוב שם נושא, מילה, מושג דקדוקי או תבנית ואמצא לך בדיוק היכן הם מופיעים במטרות הביצוע.`
+                : `שלום! בחרת לתכנן שיעור מבוסס **${booklet}**. איזה נושא או מושג תרצה ללמד היום?`;
+
+            const [messages, setMessages] = useState([
+                { role: 'model', text: initialGreeting }
+            ]);
+            const [input, setInput] = useState('');
+            const [isLoading, setIsLoading] = useState(false);
+
+            const messagesEndRef = useRef(null);
+
+            const scrollToBottom = () => {
+                messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            };
+
+            useEffect(() => {
+                scrollToBottom();
+            }, [messages, isLoading]);
+
+            const handleSend = async (textCustom) => {
+                const textToSend = textCustom || input;
+                if (!textToSend.trim() || isLoading) return;
+
+                const userText = textToSend.trim();
+                if (!textCustom) setInput('');
+                
+                const updatedMessages = [...messages, { role: 'user', text: userText }];
+                setMessages(updatedMessages);
+                setIsLoading(true);
+
+                try {
+                    const apiHistory = updatedMessages.slice(1).map(msg => ({
+                        role: msg.role,
+                        parts: [{ text: msg.text }]
+                    }));
+
+                    const payload = {
+                        contents: apiHistory,
+                        tools: mode === 'lesson' ? [{ google_search: {} }] : [],
+                        systemInstruction: {
+                            parts: [{ text: getSystemPrompt(booklet, mode) }]
+                        },
+                    };
+
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.candidates && data.candidates.length > 0) {
+                        const botResponse = data.candidates[0].content.parts[0].text;
+                        setMessages(prev => [...prev, { role: 'model', text: botResponse }]);
+                    } else {
+                        throw new Error("Invalid response format");
+                    }
+                } catch (error) {
+                    console.error("API Error:", error);
+                    setMessages(prev => [...prev, { 
+                        role: 'model', 
+                        text: 'מצטער, נתקלתי בבעיה טכנית בניסיון לעבד את הבקשה. נסה שוב.' 
+                    }]);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            const handleKeyDown = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                }
+            };
+
+            return (
+                <div className="flex flex-col h-screen max-w-5xl mx-auto bg-white shadow-2xl overflow-hidden rounded-none sm:rounded-2xl sm:h-[95vh] sm:mt-[2.5vh] sm:border border-emerald-100">
+                    <header className="bg-gradient-to-r from-emerald-800 to-teal-900 text-white border-b border-emerald-700 p-4 flex items-center justify-between z-10 shadow-md">
+                        <div className="flex items-center gap-3">
+                            <button 
+                                onClick={onBack}
+                                className="p-2 hover:bg-emerald-700/50 rounded-full transition-colors text-white focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer"
+                                title="חזרה למסך הראשי"
+                            >
+                                <Icons.ArrowRight />
+                            </button>
+                            <div>
+                                <h1 className="text-xl font-bold tracking-tight">עוזר אישי למורה ({mode === 'syllabus' ? 'איתור מיקום' : 'תכנון שיעור'})</h1>
+                                <p className="text-xs text-emerald-200 font-medium">{booklet}</p>
+                            </div>
+                        </div>
+                    </header>
+
+                    <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50 space-y-6">
+                        {messages.map((msg, index) => (
+                            <div key={index} className={`flex w-full ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`}>
+                                <div className={`flex max-w-[85%] sm:max-w-[75%] ${msg.role === 'user' ? 'flex-row' : 'flex-row-reverse'} gap-3 items-end`}>
+                                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center shadow-sm ${msg.role === 'user' ? 'bg-emerald-600 text-white' : 'bg-white border border-emerald-200 text-emerald-800'}`}>
+                                        {msg.role === 'user' ? <Icons.User /> : <Icons.Bot />}
+                                    </div>
+                                    <div 
+                                        className={`p-4 shadow-sm text-[15px] leading-relaxed ${
+                                            msg.role === 'user' 
+                                                ? 'bg-emerald-600 text-white rounded-2xl rounded-br-sm' 
+                                                : 'bg-white text-gray-800 rounded-2xl rounded-bl-sm border border-emerald-100'
+                                        }`}
+                                        dangerouslySetInnerHTML={msg.role === 'model' ? parseMarkdown(msg.text) : { __html: msg.text.replace(/\n/g, '<br/>') }}
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                        {isLoading && (
+                            <div className="flex w-full justify-end">
+                                <div className="flex max-w-[85%] flex-row-reverse gap-3 items-end">
+                                    <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center shadow-sm bg-white border border-emerald-200 text-emerald-800">
+                                        <Icons.Bot />
+                                    </div>
+                                    <div className="p-4 shadow-sm bg-white text-gray-500 rounded-2xl rounded-bl-sm border border-emerald-100 flex items-center gap-2">
+                                        <Icons.Loader /> <span>{mode === 'syllabus' ? 'סורק את החוברת ומחפש מיקומים...' : 'מנתח מטרות קודמות, אוצר מילים ומחפש חומרים ברשת...'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        <div ref={messagesEndRef} />
+                    </div>
+
+                    <div className="bg-white border-t border-gray-200 p-4 sm:p-6">
+                        <div className="max-w-4xl mx-auto relative flex items-center">
+                            <textarea
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                placeholder={mode === 'syllabus' ? "כתוב נושא, מושג דקדוקי או מילה לחיפוש מיקום בחוברת..." : "כתוב נושא לתכנון שיעור ותרגילים..."}
+                                className="w-full bg-slate-50 border border-slate-300 rounded-full pl-14 pr-6 py-3.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all resize-none overflow-hidden text-gray-800"
+                                rows="1"
+                                style={{ minHeight: '52px', maxHeight: '120px' }}
+                            />
+                            <button
+                                onClick={() => handleSend()}
+                                disabled={!input.trim() || isLoading}
+                                className="absolute left-2 w-10 h-10 flex items-center justify-center bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-full transition-colors focus:outline-none shadow-sm cursor-pointer"
+                            >
+                                <Icons.Send />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [screen, setScreen] = useState('home'); 
+            const [selectedBooklet, setSelectedBooklet] = useState(null);
+            const [selectedMode, setSelectedMode] = useState('syllabus');
+
+            useEffect(() => {
+                const link = document.createElement('link');
+                link.href = 'https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800;900&display=swap';
+                link.rel = 'stylesheet';
+                document.head.appendChild(link);
+                
+                document.body.style.fontFamily = "'Heebo', sans-serif";
+                document.body.style.backgroundColor = "#F1F5F9"; 
+            }, []);
+
+            const handleSelectBooklet = (bookletName, mode) => {
+                setSelectedBooklet(bookletName);
+                setSelectedMode(mode);
+                setScreen('chat');
+            };
+
+            const handleBackToHome = () => {
+                setScreen('home');
+                setSelectedBooklet(null);
+                setSelectedMode('syllabus');
+            };
+
+            return (
+                <div dir="rtl" className="antialiased text-slate-900 bg-slate-100 font-sans min-h-screen">
+                    {screen === 'home' ? (
+                        <HomeScreen onSelect={handleSelectBooklet} />
+                    ) : (
+                        <ChatScreen booklet={selectedBooklet} mode={selectedMode} onBack={handleBackToHome} />
+                    )}
+                </div>
+            );
+        };
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
