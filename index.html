@@ -19,7 +19,7 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        const API_KEY = ""; // Canvas will automatically inject the API key here
+        const API_KEY = ""; // Canvas or server will inject API key
         const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${API_KEY}`;
 
         const parseMarkdown = (text) => {
@@ -125,7 +125,7 @@
                     { id: 32, page: 92, title: "הלומד יכיר דרכים לחיפוש עבודה וימלא שאלון", concepts: ["חצי משרה", "משרה מלאה", "קורות חיים", "שפות"], grammar: ["בניין פיעל ל\"ה - עתיד", "בניין קל חפ\"נ / פ\"נ - עתיד (ייכנס/ייסע)", "משפט יש/אין צורך ב...", "כינוי עצמי בנטייה", "משקלי מקצועות"] },
                     { id: 33, page: 93, title: "הלומד יבין מידע בשלטים שכיחים", concepts: ["זהירות", "סכנה", "העישון אסור", "אין כניסה"], grammar: ["משפט חסר", "שם פעולה מיודע + שם תואר", "שמות פעולה בכל הבניינים והגזרות"] },
                     { id: 34, page: 94, title: "הלומד ישוחח עם רופא ויבין הוראותיו", concepts: ["צילום רנטגן", "התחייבות", "חדר מיון"], grammar: ["פעלים בסבל/סובל מ...", "פועל מזיק ל...", "לשון ציווי והוראות רופא"] },
-                    { id: 35, page: 95, title: "הלומד יתאר ויבין מידע על אנשים והתנהגותם", concepts: ["תכונת אופי", "אדיש", "בזבזן", "עקשן"], grammar: ["תואר נשואי בהווה (דומה ל... / שונה מ...)", "משפט מחובר ניגוד (לעומת זאת)"] },
+                    { id: 35, page: 95, title: "הלומד יתאר ויבין מידע על אנשים והתנהגותם", concepts: ["תכונת אופי", "אדיש", "בזבזן", "עקשן"], grammar: ["תואר נשואי בהווה (דומה ל... / שונה מ...)", "נטיית מילת היחס מן (ממני, ממך, ממנו)", "משפט מחובר ניגוד (לעומת זאת)"] },
                     { id: 36, page: 96, title: "הלומד יבין מידע חדשותי קצר וידווח עליו", concepts: ["אבטלה", "דמי אבטלה", "משא ומתן"], grammar: ["בניין הפעיל חפ\"נ / פ\"נ (עבר/עתיד)", "בניין הפעיל נפי\"ו / פ\"י (עבר/הווה/עתיד, כגון: מוריד/יוריד)", "משפט עתיד קרוב (עומד + שם פועל)", "שם המספר מונה ממיליון ומעלה"] },
                     { id: 37, page: 97, title: "הלומד יכיר את דגל המדינה, סמלה וההמנון", concepts: ["בית המקדש", "הקונגרס הציוני", "מגן דוד", "טלית"], grammar: ["טקסט מורשת ושירה"] },
                     { id: 38, page: 98, title: "הלומד יכיר אישים ומקומות חשובים בתולדות הארץ", concepts: ["הסכם שלום", "מלחמת העולם", "על שם"], grammar: ["משפט פועלי בעבר (קם ב... / נולד / נרצח / נהורס)"] }
@@ -183,9 +183,8 @@ ${goalsStr}
 5. בסוף התשובה שלך, שאל בדיוק את השאלה הבאה: "האם תרצה לקרוא את התוכן של עמודים אלו?"
 `;
             } else {
-                // Lesson Planning Mode
                 return `
-אתה עוזר פדגוגي מומחה לתכנון שיעורים והוראת עברית כשפה שנייה (עולים חדשים) המבוסס על "${booklet}".
+אתה עוזר פדגוגי מומחה לתכנון שיעורים והוראת עברית כשפה שנייה (עולים חדשים) המבוסס על "${booklet}".
 הנה רשימת מטרות הביצוע והמושגים בחוברת לצורך התאמה רמתית:
 ${goalsStr}
 
@@ -205,13 +204,13 @@ ${goalsStr}
 
         const HomeScreen = ({ onSelect }) => {
             const [showBookletModal, setShowBookletModal] = useState(false);
-            const [selectedAction, setSelectedAction] = useState(null); // 'syllabus' or 'lesson'
+            const [selectedAction, setSelectedAction] = useState(null);
             const [isEditingHeader, setIsEditingHeader] = useState(false);
             
             const [headerConfig, setHeaderConfig] = useState({
                 title: "ברוכים הבאים - עזר למורים",
                 subtitle: "באיזו חוברת תרצו להשתמש היום? בצעו בחירה והפיקו מערכי שיעור מותאמים.",
-                imageUrl: "image_c6369f.png"
+                imageUrl: "image_c6396e.png"
             });
 
             const [tempConfig, setTempConfig] = useState(headerConfig);
@@ -248,7 +247,6 @@ ${goalsStr}
             return (
                 <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-100 flex flex-col items-center justify-center p-4 sm:p-8 relative">
                     
-                    {/* Floating Edit Header Button */}
                     <button
                         onClick={() => { setTempConfig(headerConfig); setIsEditingHeader(true); }}
                         className="absolute top-4 left-4 bg-white/90 backdrop-blur-md border border-emerald-300 hover:bg-emerald-600 hover:text-white text-emerald-800 px-4 py-2 rounded-2xl shadow-md font-bold text-sm flex items-center gap-2 transition-all cursor-pointer z-20"
@@ -259,7 +257,6 @@ ${goalsStr}
 
                     <div className="max-w-4xl w-full mx-auto space-y-8 text-center">
                         
-                        {/* Header Section (Green placeholder box completely removed) */}
                         <div className="space-y-4 max-w-3xl mx-auto pt-4">
                             <h1 className="text-4xl sm:text-6xl font-black text-slate-900 tracking-tight">
                                 {headerConfig.title}
@@ -269,7 +266,6 @@ ${goalsStr}
                             </p>
                         </div>
 
-                        {/* Clickable Lesson Planning AI Banner */}
                         <button 
                             onClick={() => triggerAction('lesson')}
                             className="w-full bg-white/95 backdrop-blur-md border-3 border-emerald-300 rounded-3xl p-6 sm:p-8 shadow-xl hover:shadow-2xl hover:border-emerald-600 transition-all duration-300 text-right flex items-center justify-between cursor-pointer group focus:outline-none focus:ring-4 focus:ring-emerald-300"
@@ -288,7 +284,6 @@ ${goalsStr}
                             </div>
                         </button>
 
-                        {/* Booklet Selection Buttons (Syllabus Search Mode - strictly location lookup) */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-2xl mx-auto pt-2">
                             <button 
                                 onClick={() => onSelect('חוברת רמה א-ב', 'syllabus')}
@@ -319,7 +314,6 @@ ${goalsStr}
 
                     </div>
 
-                    {/* Booklet Selection Modal triggered by Lesson Planning banner */}
                     {showBookletModal && (
                         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
                             <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-6 text-right">
@@ -357,7 +351,6 @@ ${goalsStr}
                         </div>
                     )}
 
-                    {/* Header Customization Modal */}
                     {isEditingHeader && (
                         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
                             <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 text-right max-h-[90vh] overflow-y-auto">
